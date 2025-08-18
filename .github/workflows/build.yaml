@@ -4,9 +4,6 @@ on:
   push:
     branches: ["**"]
 
-permissions:
-  content: read
-
 env:
   IMAGE_NAME: local/flask-app
 
