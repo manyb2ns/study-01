@@ -2,7 +2,7 @@ name: Build flask app
 
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
+  Build-Flask:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Build Start."
@@ -13,4 +13,7 @@ jobs:
           docker build -t flask-test:latest .
       - name: Run a container
         run: |
-          docker run -p 5000:5000 flask-test
+          docker run -p 5000:5000 flask-test &
+          sleep 3
+          curl `hostname -I`:5000
+          kill -9 `ps -ef | grep flask | awk '{print $1}'`
