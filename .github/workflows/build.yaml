@@ -1,19 +1,60 @@
 name: Build flask app
 
-on: [push]
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  content: read
+
+env:
+  IMAGE_NAME: local/flask-app
+
 jobs:
-  Build-Flask:
+  build-and-test:
     runs-on: ubuntu-latest
+
     steps:
-      - run: echo "Build Start."
-      - name: Check out repository code
+      - name: Check out
         uses: actions/checkout@v4
+
       - name: Build a container image
         run: |
           docker build -t flask-test:latest .
+
       - name: Run a container
         run: |
-          docker run -p 5000:5000 flask-test &
-          sleep 3
-          curl http://127.0.0.1:5000
-          kill -9 `ps -ef | grep flask | awk '{print $1}'`
+          docker run -d -rm --name flask \
+          -p 5000:5000 \
+          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Wait for app & smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 1) 부팅 대기 (최대 20초)
+          for i in {1..20}; do
+            if curl -fsS http://localhost:5000/ >/dev/null; then
+              echo "App is responding"; break
+            fi
+            sleep 1
+            if [[ $i -eq 20 ]]; then
+              echo "App did not respond in time" >&2
+              exit 1
+            fi
+          done
+
+          # 2) 엔드포인트 스모크 테스트
+          curl -fsS http://localhost:5000/           | grep -q "index"
+          curl -fsS http://localhost:5000/login      | grep -q "login"
+          curl -fsS "http://localhost:5000/user/John%20Doe" | grep -q "John Doe's profile"
+
+          echo "Smoke tests passed ✅"
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs flask-app || true
+
+      - name: Stop container
+        if: always()
+        run: docker stop flask-app || true
