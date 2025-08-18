@@ -8,6 +8,9 @@ jobs:
       - run: echo "Build Start."
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: List files in the repository
+      - name: Build a container image
         run: |
-          docker run --port 5000:5000 flask-test
+          docker build -t flask-test:latest .
+      - name: Run a container
+        run: |
+          docker run -p 5000:5000 flask-test
