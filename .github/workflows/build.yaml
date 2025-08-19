@@ -2,7 +2,7 @@ name: DEV - Build Flask APP
 
 on:
   push:
-    branches: ["dev"]
+    branches: ["main", "dev"]
 
 permissions:
   id-token: write   # OIDC 토큰 발급 허용
