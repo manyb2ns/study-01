@@ -3,7 +3,6 @@ name: Build Flask APP
 on:
   push:
     branches: ["main", "dev"]
-  workflow_dispatch:  #
 
 env:
   IMAGE_NAME: flask-app
@@ -35,18 +34,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # - name: Set IMAGE_TAG
-      #   run: |
-      #     REF="${{ github.ref_name }}"
-      #     if [[ $REF == "main" ]]; then
-      #       TAG="prod"
-      #     elif [[ $REF == "dev" ]]; then
-      #       TAG="dev"
-      #     else
-      #       TAG="$REF"
-      #     fi
-      #     echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -56,23 +43,18 @@ jobs:
             type=raw,value=${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'dev' && 'dev' || github.ref_name }}
             type=sha,format=short
 
-      # - name: Build & Push to ECR
-      #   env:
-      #     REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #     REPOSITORY: devops/study-01
-      #   run: |
-      #     docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-      #     docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-
+      # 멀티아키텍처 빌드(예: amd64 + arm64)를 원할 때 QEMU 에뮬레이션 활성화 용도
       - name: Set up QEMU (optional, multi-arch 시)
         uses: docker/setup-qemu-action@v3
 
+      # BuildKit 기반 buildx 빌더를 생성/활성화
       - name: Set up Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
         with:
-          install: true               # 생성한 빌더를 기본 빌더로 등록
-          driver: docker-container    # 캐시 export 지원 드라이버
+          install: true               # 생성한 빌더를 기본 빌더로 등록 -> build-push-action이 자동 사용
+          driver: docker-container    # 캐시 export/import(예: type=gha) 지원 드라이버
+                                      # 기본 docker 드라이버는 cache-to 같은 캐시 백엔드를 지원하지 않음
 
       - name: Build & Push (with cache)
         uses: docker/build-push-action@v6
@@ -81,5 +63,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max # type=gha : Github Action(gha) 캐시 스토리지로 Dockerfile 레이어들을 업로드
+          cache-from: type=gha        # mode=max : 캐시 Export 시 어떤 레이어를 저장할지 설정 (max는 최대한 저장해서 캐시 히트율 높음)

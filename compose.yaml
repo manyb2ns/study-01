@@ -1,0 +1,25 @@
+services:
+  blue:
+    build: .
+    container_name: blue
+    environment:
+      - COLOR=blue
+    expose:
+      - "5000"
+  green:
+    build: .
+    container_name: green
+    environment:
+      - COLOR=green
+    expose:
+      - "5000"
+
+  gateway:
+    image: nginx:alpine
+    container_name: gateway
+    ports:
+      - "5001:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./active_upstream.conf:/etc/nginx/conf.d/active_upstream.conf
+    depends_on: [blue, green]
