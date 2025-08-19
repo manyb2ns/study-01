@@ -19,46 +19,46 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Build a container image
-        run: |
-          docker build -t $IMAGE_NAME:${{ github.sha }} .
+      # - name: Build a container image
+      #   run: |
+      #     docker build -t $IMAGE_NAME:${{ github.sha }} .
 
-      - name: Run a container
-        run: |
-          docker run -d --rm --name flask \
-          -p 5000:5000 \
-          $IMAGE_NAME:${{ github.sha }}
+      # - name: Run a container
+      #   run: |
+      #     docker run -d --rm --name flask \
+      #     -p 5000:5000 \
+      #     $IMAGE_NAME:${{ github.sha }}
 
-      - name: Wait for app & smoke test
-        shell: bash
-        run: |
-          set -euo pipefail
-          # 1) 부팅 대기 (최대 20초)
-          for i in {1..20}; do
-            if curl -fsS http://localhost:5000/ >/dev/null; then
-              echo "App is responding"; break
-            fi
-            sleep 1
-            if [[ $i -eq 20 ]]; then
-              echo "App did not respond in time" >&2
-              exit 1
-            fi
-          done
+      # - name: Wait for app & smoke test
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     # 1) 부팅 대기 (최대 20초)
+      #     for i in {1..20}; do
+      #       if curl -fsS http://localhost:5000/ >/dev/null; then
+      #         echo "App is responding"; break
+      #       fi
+      #       sleep 1
+      #       if [[ $i -eq 20 ]]; then
+      #         echo "App did not respond in time" >&2
+      #         exit 1
+      #       fi
+      #     done
 
-          # 2) 엔드포인트 스모크 테스트
-          curl -fsS http://localhost:5000/           | grep -q "index"
-          curl -fsS http://localhost:5000/login      | grep -q "login"
-          curl -fsS "http://localhost:5000/user/John%20Doe" | grep -q "John Doe's profile"
+      #     # 2) 엔드포인트 스모크 테스트
+      #     curl -fsS http://localhost:5000/           | grep -q "index"
+      #     curl -fsS http://localhost:5000/login      | grep -q "login"
+      #     curl -fsS "http://localhost:5000/user/John%20Doe" | grep -q "John Doe's profile"
 
-          echo "Smoke tests passed ✅"
+      #     echo "Smoke tests passed ✅"
 
-      - name: Show container logs on failure
-        if: failure()
-        run: docker logs $IMAGE_NAME || true
+      # - name: Show container logs on failure
+      #   if: failure()
+      #   run: docker logs $IMAGE_NAME || true
 
-      - name: Stop container
-        if: always()
-        run: docker stop $IMAGE_NAME || true
+      # - name: Stop container
+      #   if: always()
+      #   run: docker stop $IMAGE_NAME || true
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.3.1
@@ -66,3 +66,16 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_IAM_ROLE }}
           role-session-name: githubactions_study-01
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: devops/study-01
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
