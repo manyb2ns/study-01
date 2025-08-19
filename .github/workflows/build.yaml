@@ -5,7 +5,7 @@ on:
     branches: ["**"]
 
 env:
-  IMAGE_NAME: local/flask-app
+  IMAGE_NAME: flask-test
 
 jobs:
   build-and-test:
@@ -17,13 +17,13 @@ jobs:
 
       - name: Build a container image
         run: |
-          docker build -t flask-test:${{ github.sha }} .
+          docker build -t $IMAGE_NAME:${{ github.sha }} .
 
       - name: Run a container
         run: |
           docker run -d --rm --name flask \
           -p 5000:5000 \
-          flask-test:${{ github.sha }}
+          $IMAGE_NAME:${{ github.sha }}
 
       - name: Wait for app & smoke test
         shell: bash
@@ -50,8 +50,15 @@ jobs:
 
       - name: Show container logs on failure
         if: failure()
-        run: docker logs flask-app || true
+        run: docker logs $IMAGE_NAME || true
 
       - name: Stop container
         if: always()
-        run: docker stop flask-app || true
+        run: docker stop $IMAGE_NAME || true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_IAM_ROLE }}
+          role-session-name: githubactions_study-01
