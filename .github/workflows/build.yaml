@@ -1,12 +1,9 @@
-name: DEV - Build Flask APP
+name: Build Flask APP
 
 on:
   push:
     branches: ["main", "dev"]
-
-permissions:
-  id-token: write   # OIDC 토큰 발급 허용
-  contents: read    # 리포 콘텐츠 읽기(일반적으로 필요)
+  workflow_dispatch:  #
 
 env:
   IMAGE_NAME: flask-app
@@ -14,6 +11,14 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # 권한을 Job 스코프로 제한
+    permissions:
+      id-token: write   # OIDC 토큰 발급 허용
+      contents: read    # 리포 콘텐츠 읽기 (일반적으로 필요)
+    # 같은 브랜치에서 중복 실행 시 이전 잡 자동 취소
+    concurrency:
+      group: build-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Check out
@@ -24,28 +29,47 @@ jobs:
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ vars.AWS_IAM_ROLE }}
-          role-session-name: githubactions_study-01
+          role-session-name: actions_study01-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set IMAGE_TAG
-        run: |
-          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "IMAGE_TAG=prod" >> $GITHUB_ENV
-          elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
-            echo "IMAGE_TAG=dev" >> $GITHUB_ENV
-          else
-            echo "IMAGE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
-          fi
+      # - name: Set IMAGE_TAG
+      #   run: |
+      #     REF="${{ github.ref_name }}"
+      #     if [[ $REF == "main" ]]; then
+      #       TAG="prod"
+      #     elif [[ $REF == "dev" ]]; then
+      #       TAG="dev"
+      #     else
+      #       TAG="$REF"
+      #     fi
+      #     echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
-      - name: Build & Push to ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: devops/study-01
-          # IMAGE_TAG: ${{ github.sha }}
-          # IMAGE_TAG: ${{ github.ref_name }}
-        run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/devops/study-01
+          tags: |
+            type=raw,value=${{ github.ref_name == 'main' && 'prod' || github.ref_name == 'dev' && 'dev' || github.ref_name }}
+            type=sha,format=short
+
+      # - name: Build & Push to ECR
+      #   env:
+      #     REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #     REPOSITORY: devops/study-01
+      #   run: |
+      #     docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+      #     docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      - name: Build & Push (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
