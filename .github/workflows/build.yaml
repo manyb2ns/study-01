@@ -34,8 +34,10 @@ jobs:
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
             echo "IMAGE_TAG=prod" >> $GITHUB_ENV
-          else [[ "${GITHUB_REF##*/}" == "dev" ]]; then
+          elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
             echo "IMAGE_TAG=dev" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
           fi
 
       - name: Build & Push to ECR
