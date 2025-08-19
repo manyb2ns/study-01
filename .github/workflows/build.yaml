@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+permissions:
+  id-token: write   # OIDC 토큰 발급 허용
+  contents: read    # 리포 콘텐츠 읽기(일반적으로 필요)
+
 env:
   IMAGE_NAME: flask-test
 
