@@ -17,13 +17,13 @@ jobs:
 
       - name: Build a container image
         run: |
-          docker build -t flask-test:latest .
+          docker build -t flask-test:${{ github.sha }} .
 
       - name: Run a container
         run: |
           docker run -d --rm --name flask \
           -p 5000:5000 \
-          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          flask-test:${{ github.sha }}
 
       - name: Wait for app & smoke test
         shell: bash
